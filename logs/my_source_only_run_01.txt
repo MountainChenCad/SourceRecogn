@@ -1,0 +1,59 @@
+Source Only Training Run: my_source_only_run_01
+===================================
+Timestamp: 2025-05-05 14:01:53.963796
+Source Dataset: train.h5
+Target/Test Dataset: test.h5
+Weight Path: ./weights/
+Log Path: ./logs/my_source_only_run_01.txt
+Class Num: 6
+Classes: ['BPSK', '8PSK', 'PAM4', 'PAM8', '16QAM', '64QAM']
+Batch Size: 2
+Max Iterations: 50000
+Test Interval: 200
+Learning Rate: 0.001
+Seed: 2021
+GPU ID: 0
+===================================
+
+**************** 开始加载源域训练数据 ****************
+数据集ModData维度：(96, 6, 512)
+数据集ModType维度：(96,)
+源域数据加载成功: 96 样本.
+**************** 开始加载目标域测试数据 ****************
+数据集ModData维度：(96, 6, 128)
+数据集ModType维度：(96,)
+目标域测试数据加载成功: 96 样本.
+**************** 开始训练 ****************
+--- Iteration 200/50000 ---
+Iter Loss: 1.7912, LR: 0.000367
+Target Eval Acc: 30.2083%, Mean Entropy: 1.7138
+Best accuracy improved to 30.2083%. Saving model to ./weights/my_source_only_run_01.pt
+
+--- Iteration 400/50000 ---
+Iter Loss: 1.9442, LR: 0.000384
+Target Eval Acc: 36.4583%, Mean Entropy: 1.6078
+Best accuracy improved to 36.4583%. Saving model to ./weights/my_source_only_run_01.pt
+
+--- Iteration 600/50000 ---
+Iter Loss: 2.0158, LR: 0.000924
+Target Eval Acc: 25.0000%, Mean Entropy: 1.3972
+
+--- Iteration 800/50000 ---
+Iter Loss: 1.2474, LR: 0.000393
+Target Eval Acc: 35.4167%, Mean Entropy: 1.5248
+
+--- Iteration 1000/50000 ---
+Iter Loss: 1.9367, LR: 0.000004
+Target Eval Acc: 30.2083%, Mean Entropy: 1.3524
+
+--- Iteration 1200/50000 ---
+Iter Loss: 1.6637, LR: 0.000926
+Target Eval Acc: 33.3333%, Mean Entropy: 1.4368
+
+--- Iteration 1400/50000 ---
+Iter Loss: 1.5507, LR: 0.000698
+Target Eval Acc: 25.0000%, Mean Entropy: 1.3131
+
+--- Iteration 1600/50000 ---
+Iter Loss: 1.4709, LR: 0.000398
+Target Eval Acc: 36.4583%, Mean Entropy: 1.4178
