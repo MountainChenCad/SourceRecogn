@@ -1,0 +1,3 @@
+此时目标域数据集是E:\software\DataSet\highsnr_sps4_len512_num10000_train_ori_rate1.h5
+此时权重文件名称是E:\software\ModelWeight\MMDA_MR_1_2_rate1_best_model.pt
+****************开始加载目标域数据****************
