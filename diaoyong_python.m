@@ -1,1 +1,0 @@
-[status,cmdout]=system('D:\Anaconda3\envs\torch\python.exe E:\xuqiang\ch5_final\software\print.py');
