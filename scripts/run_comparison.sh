@@ -5,13 +5,13 @@ SOURCE_DATA="dataset/source/BPSK-500Kbps-DATA.h5"
 TARGET_DATA="dataset/target/TARGET-BPSK-DATA.h5" # Replace with your target file name
 MODEL_TYPE="resnet" # Or 'lstm'
 SEGMENT_LENGTH=1024
-BATCH_SIZE=2048
+BATCH_SIZE=128
 EPOCHS=50 # Adjust as needed
-LR=1e-3
+LR=1e-5
 RESULTS_DIR="results/comparison_${MODEL_TYPE}_seg${SEGMENT_LENGTH}"
 SAVE_NAME_BASE="comp_${MODEL_TYPE}_seg${SEGMENT_LENGTH}"
 SEED=42
-PRETRAINED_MODEL_PATH="results/comparison_resnet_seg1024/models/comp_resnet_seg1024_source_pretrained_source_pretrained_final.pth.tar"
+
 # Ensure results directory exists
 mkdir -p $RESULTS_DIR/models
 
@@ -21,7 +21,7 @@ echo "Results will be saved in: $RESULTS_DIR"
 
 # --- Step 1: Pre-train on Source ---
 echo "\n----- Step 1: Pre-training on Source Domain -----"
-PRETRAINED_MODEL_PATH="${RESULTS_DIR}/models/${SAVE_NAME_BASE}_source_pretrained_final.pth.tar" # Use _final or _best
+PRETRAINED_MODEL_PATH="${RESULTS_DIR}/models/${SAVE_NAME_BASE}_source_pretrained_source_pretrained_final.pth.tar" # Use _final or _best
 python -m src.main \
     --source_data $SOURCE_DATA \
     --target_data $TARGET_DATA \
@@ -79,22 +79,22 @@ python -m src.main \
     --num_classes_target 8
     # Add --freeze_backbone here if you want to test freezing first
 
-# --- Step 4: Train on Target Only (From Scratch) ---
-echo "\n----- Step 4: Training on Target Only (From Scratch) -----"
-python -m src.main \
-    --source_data $SOURCE_DATA \
-    --target_data $TARGET_DATA \
-    --model_type $MODEL_TYPE \
-    --segment_length $SEGMENT_LENGTH \
-    --batch_size $BATCH_SIZE \
-    --epochs $EPOCHS \
-    --lr $LR \
-    --mode target_only \
-    --results_dir $RESULTS_DIR \
-    --save_name "${SAVE_NAME_BASE}_target_only" \
-    --seed $SEED \
-    --num_classes_source 8 \
-    --num_classes_target 8
+## --- Step 4: Train on Target Only (From Scratch) ---
+#echo "\n----- Step 4: Training on Target Only (From Scratch) -----"
+#python -m src.main \
+#    --source_data $SOURCE_DATA \
+#    --target_data $TARGET_DATA \
+#    --model_type $MODEL_TYPE \
+#    --segment_length $SEGMENT_LENGTH \
+#    --batch_size $BATCH_SIZE \
+#    --epochs $EPOCHS \
+#    --lr $LR \
+#    --mode target_only \
+#    --results_dir $RESULTS_DIR \
+#    --save_name "${SAVE_NAME_BASE}_target_only" \
+#    --seed $SEED \
+#    --num_classes_source 8 \
+#    --num_classes_target 8
 
 
 echo "===== Comparison Experiment Finished ====="

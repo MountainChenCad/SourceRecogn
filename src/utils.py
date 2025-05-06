@@ -141,7 +141,7 @@ def get_args():
     parser.add_argument('--num_classes_target', type=int, default=8, help='Number of classes in the target domain')
 
     # Model args
-    parser.add_argument('--model_type', type=str, default='resnet', choices=['resnet', 'lstm'], help='Backbone model type')
+    parser.add_argument('--model_type', type=str, default='lstm', choices=['resnet', 'lstm'], help='Backbone model type')
     # Add model specific args if needed (e.g., lstm_hidden_size, resnet_layers)
 
     # Training args
