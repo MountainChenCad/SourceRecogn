@@ -5,13 +5,13 @@ SOURCE_DATA="dataset/source/BPSK-500Kbps-DATA.h5"
 TARGET_DATA="dataset/target/TARGET-BPSK-DATA.h5" # Replace with your target file name
 MODEL_TYPE="resnet" # Or 'lstm'
 SEGMENT_LENGTH=1024
-BATCH_SIZE=64
+BATCH_SIZE=2048
 EPOCHS=50 # Adjust as needed
 LR=1e-3
 RESULTS_DIR="results/comparison_${MODEL_TYPE}_seg${SEGMENT_LENGTH}"
 SAVE_NAME_BASE="comp_${MODEL_TYPE}_seg${SEGMENT_LENGTH}"
 SEED=42
-
+PRETRAINED_MODEL_PATH="results/comparison_resnet_seg1024/models/comp_resnet_seg1024_source_pretrained_source_pretrained_final.pth.tar"
 # Ensure results directory exists
 mkdir -p $RESULTS_DIR/models
 
