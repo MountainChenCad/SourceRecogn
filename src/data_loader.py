@@ -4,144 +4,138 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
 from sklearn.model_selection import train_test_split
-import logging  # Import logging
+import logging
 
 
 def load_h5_data(filepath, class_indices=None, num_expected_classes=None):
     try:
         with h5py.File(filepath, 'r') as f:
             all_iq_data = f['Data_IQ'][:]
-            original_labels_from_file = f['Label'][:]
+            original_labels_from_file = f['Label'][:]  # Labels as they are in the HDF5 file
 
-            # Attempt to load class names
-            loaded_class_names = []
+            loaded_h5_class_names = []
             if 'classes' in f:
                 try:
-                    loaded_class_names = [c.decode('utf-8') if isinstance(c, bytes) else str(c) for c in
-                                          f['classes'][:]]
+                    loaded_h5_class_names = [c.decode('utf-8') if isinstance(c, bytes) else str(c) for c in
+                                             f['classes'][:]]
+                    logging.info(
+                        f"Successfully loaded {len(loaded_h5_class_names)} class names from 'classes' dataset in {filepath}.")
                 except Exception as e:
-                    logging.warning(f"Could not decode class names from {filepath}: {e}. Using generic names.")
+                    logging.warning(
+                        f"Could not decode class names from {filepath}: {e}. Will use numeric labels if mapping fails.")
+            else:
+                logging.info(f"No 'classes' dataset found in {filepath}. Will use numeric labels.")
 
-        # ... (existing label processing and remapping logic from your file) ...
         iq_data = all_iq_data
-        final_class_names_for_model = []  # Names corresponding to the remapped 0 to K-1 labels
 
+        # Determine the set of original HDF5 label values that will be used
         if class_indices is not None and len(class_indices) > 0:
-            logging.info(f"Filtering data for original class values: {class_indices} from HDF5 file: {filepath}")
+            logging.info(f"Filtering data for original HDF5 class values: {class_indices}")
             mask = np.isin(original_labels_from_file, class_indices)
             iq_data = all_iq_data[mask]
-            labels_to_remap = original_labels_from_file[mask]
-
-            if len(labels_to_remap) == 0:
+            active_original_labels = original_labels_from_file[mask]  # Labels from HDF5 that are selected
+            if len(active_original_labels) == 0:
                 logging.warning(f"No samples found for class_indices {class_indices} in {filepath}.")
                 return np.array([]), np.array([], dtype=np.int64), []
-
-            unique_selected_original_labels = sorted(list(set(labels_to_remap)))
-            if num_expected_classes is not None and len(unique_selected_original_labels) != num_expected_classes:
-                logging.critical(
-                    f"Num unique selected original labels ({len(unique_selected_original_labels)}) != num_expected_classes ({num_expected_classes}).")
-
-            label_map = {old_label: new_label for new_label, old_label in enumerate(unique_selected_original_labels)}
-            processed_labels = np.array([label_map[l] for l in labels_to_remap], dtype=np.int64)
-
-            # Create final_class_names_for_model based on the remapped labels
-            # It should have length `num_expected_classes` or `len(unique_selected_original_labels)`
-            # And its indices should correspond to the new remapped labels (0, 1, 2...)
-            # The name at final_class_names_for_model[new_label] should be the name of original_label
-
-            final_class_names_for_model = [""] * len(unique_selected_original_labels)
-            if loaded_class_names:
-                original_labels_in_h5_file_sorted = sorted(list(set(original_labels_from_file)))
-                # Map from original HDF5 label value to its HDF5 name string
-                original_h5_label_to_name_map = {orig_lbl_val: loaded_class_names[orig_idx]
-                                                 for orig_idx, orig_lbl_val in
-                                                 enumerate(original_labels_in_h5_file_sorted)
-                                                 if orig_idx < len(loaded_class_names)}
-
-                for original_label_val, new_label_idx in label_map.items():
-                    if original_label_val in original_h5_label_to_name_map:
-                        final_class_names_for_model[new_label_idx] = original_h5_label_to_name_map[original_label_val]
-                    else:  # Fallback if name not found for some reason
-                        final_class_names_for_model[new_label_idx] = f"OrigClass {original_label_val}"
-            else:  # No class names in HDF5
-                for original_label_val, new_label_idx in label_map.items():
-                    final_class_names_for_model[new_label_idx] = f"Class {new_label_idx} (Orig {original_label_val})"
-
-            logging.info(
-                f"Selected {len(processed_labels)} samples. Remapped labels mapping: {label_map}. Final model class names: {final_class_names_for_model}")
-
-        else:  # Use all labels
+            unique_active_original_labels = sorted(list(set(active_original_labels)))
+        else:
             logging.info(f"Using all labels from HDF5 file: {filepath}")
-            labels_to_remap = original_labels_from_file
-            if len(labels_to_remap) == 0:
+            active_original_labels = original_labels_from_file
+            if len(active_original_labels) == 0:
                 logging.warning(f"No labels found in {filepath}.")
                 return np.array([]), np.array([], dtype=np.int64), []
+            unique_active_original_labels = sorted(list(set(active_original_labels)))
 
-            unique_original_labels_in_file = sorted(list(set(labels_to_remap)))
-            if num_expected_classes is not None and len(unique_original_labels_in_file) != num_expected_classes:
-                logging.critical(
-                    f"Num unique original labels in file ({len(unique_original_labels_in_file)}) != num_expected_classes ({num_expected_classes}).")
+        # --- Remap active original labels to 0 to K-1 for the model ---
+        # K is num_expected_classes or len(unique_active_original_labels)
 
-            label_map = {old_label: new_label for new_label, old_label in enumerate(unique_original_labels_in_file)}
-            processed_labels = np.array([label_map[l] for l in labels_to_remap], dtype=np.int64)
+        num_model_classes = num_expected_classes
+        if num_model_classes is None:
+            num_model_classes = len(unique_active_original_labels)
+            logging.info(f"num_expected_classes not provided, set to found unique labels: {num_model_classes}")
 
-            # Create final_class_names_for_model for all labels
-            final_class_names_for_model = [""] * len(unique_original_labels_in_file)
-            if loaded_class_names:
-                # Assuming loaded_class_names corresponds to the sorted unique original labels in the HDF5 file
-                # This might be fragile if 'classes' dataset doesn't align perfectly with 'Label' values
-                # A safer way would be if 'classes' dataset also had an associated mapping or if its order was guaranteed
-                for original_label_val, new_label_idx in label_map.items():
-                    # Find the original index of original_label_val in the sorted unique labels of the HDF5 to get its name
-                    try:
-                        original_h5_idx = list(original_labels_from_file).index(
-                            original_label_val)  # This is not robust, need a better map
-                        # A better approach: if 'classes' in HDF5 corresponds to labels 0..N-1 from HDF5's perspective
-                        # And those HDF5 labels are [l0, l1, l2...], then loaded_class_names[i] is name for li
-                        # We need to map our `original_label_val` (which is one of l0,l1,l2) to its name.
-                        # If `loaded_class_names` was created by `create_target_h5.py`, it means `loaded_class_names[i]` is the name for label `i` from that file.
-                        # So, `original_label_val` (e.g. 0, 2, 4...) should directly index `loaded_class_names` if they were 0-indexed in the H5.
-                        # Given `create_target_h5.py` assigns labels 0,1,2... and class names in that order.
-                        if original_label_val < len(
-                                loaded_class_names):  # This is true if original_labels are 0-indexed and contiguous
-                            final_class_names_for_model[new_label_idx] = loaded_class_names[original_label_val]
-                        else:  # Fallback if original H5 labels were not 0-indexed or names are missing
-                            final_class_names_for_model[new_label_idx] = f"OrigClass {original_label_val}"
-                    except ValueError:
-                        final_class_names_for_model[new_label_idx] = f"OrigClass {original_label_val}"  # Fallback
-            else:  # No class names in HDF5
-                for original_label_val, new_label_idx in label_map.items():
-                    final_class_names_for_model[new_label_idx] = f"Class {new_label_idx} (Orig {original_label_val})"
+        if len(unique_active_original_labels) != num_model_classes:
+            logging.warning(f"Number of unique active original labels ({len(unique_active_original_labels)}) "
+                            f"does not match num_model_classes ({num_model_classes}). This might lead to issues if not intended.")
+            # If using a subset via class_indices, num_model_classes should be len(unique_active_original_labels)
+            # If using all, num_model_classes should be len(unique_active_original_labels) (if num_expected_classes was None)
+            # or num_expected_classes (if provided, and they should match)
 
-            logging.info(
-                f"Processed all labels. Remapped mapping: {label_map}. Final model class names: {final_class_names_for_model}")
+        # label_map: maps from an original HDF5 label value (from unique_active_original_labels)
+        # to a new model label (0 to num_model_classes-1)
+        label_map = {orig_label: new_label for new_label, orig_label in enumerate(unique_active_original_labels)}
 
-        # ... (existing print statements for label checks - convert to logging) ...
+        # Ensure label_map only contains keys that are in unique_active_original_labels
+        # and values are within 0 to num_model_classes-1
+        # This should be correct if unique_active_original_labels is what's used to define the mapping.
+        # If len(unique_active_original_labels) > num_model_classes, some original labels won't be used.
+        # If len(unique_active_original_labels) < num_model_classes, model expects more classes than available.
+
+        processed_labels = np.array([label_map[l] for l in active_original_labels if l in label_map], dtype=np.int64)
+
+        # --- Construct final_class_names_for_model (length num_model_classes) ---
+        final_class_names_for_model = [f"Label {i}" for i in range(num_model_classes)]  # Default to numeric names
+
+        if loaded_h5_class_names:
+            # Try to map names. This is the tricky part.
+            # Assumption 1: If create_target_h5.py was used, HDF5 'classes' are for HDF5 labels 0, 1, 2...
+            # Assumption 2: For source, HDF5 'classes' might be for its own internal 0..7, while 'Label' is 0,2,4..
+
+            # Let's try a direct mapping if original HDF5 labels were simple 0-indexed
+            # This is more likely for target_domain.h5
+            all_original_h5_labels_sorted = sorted(list(set(original_labels_from_file)))
+
+            # Heuristic: if HDF5 labels are 0,1,2... and match length of loaded_h5_class_names
+            is_h5_simple_0_indexed = (
+                        all_original_h5_labels_sorted == list(range(len(all_original_h5_labels_sorted))) and
+                        len(all_original_h5_labels_sorted) == len(loaded_h5_class_names))
+
+            for orig_hdf5_label_val, model_label_idx in label_map.items():
+                # orig_hdf5_label_val is one of the unique_active_original_labels
+                # model_label_idx is its remapped value (0 to K-1)
+                if model_label_idx < num_model_classes:  # Ensure we don't write out of bounds
+                    found_name = None
+                    if is_h5_simple_0_indexed:
+                        # If HDF5 labels (all of them, not just active) were 0,1,2...N-1
+                        # and loaded_h5_class_names has N names, then names[orig_hdf5_label_val] is the name.
+                        if orig_hdf5_label_val < len(loaded_h5_class_names):
+                            found_name = loaded_h5_class_names[orig_hdf5_label_val]
+                    else:
+                        # More complex case (e.g., source BPSK file where labels are 0,2,4...)
+                        # Try to find orig_hdf5_label_val in the sorted unique labels from the HDF5 file
+                        # and use its index to get the name from loaded_h5_class_names,
+                        # IF loaded_h5_class_names corresponds to this sorted order.
+                        try:
+                            idx_in_h5_sorted_labels = all_original_h5_labels_sorted.index(orig_hdf5_label_val)
+                            if idx_in_h5_sorted_labels < len(loaded_h5_class_names):
+                                found_name = loaded_h5_class_names[idx_in_h5_sorted_labels]
+                        except ValueError:
+                            pass  # orig_hdf5_label_val not in all_original_h5_labels_sorted (should not happen if logic is right)
+
+                    if found_name:
+                        final_class_names_for_model[model_label_idx] = found_name
+                    # If found_name is still None, it will keep the default "Label X"
+
+        logging.info(f"File: {filepath} - Remapped active HDF5 labels {unique_active_original_labels} to model labels "
+                     f"using map: {label_map}. Resulting model class names (len {len(final_class_names_for_model)}): {final_class_names_for_model}")
+
+        # Sanity checks (convert prints to logging)
         logging.info(
             f"Loaded data from {filepath}. IQ shape: {iq_data.shape}, Processed Labels shape: {processed_labels.shape}")
         if len(processed_labels) > 0:
-            logging.info(
-                f"Min processed label: {np.min(processed_labels)}, Max processed label: {np.max(processed_labels)}")
+            min_proc_label, max_proc_label = np.min(processed_labels), np.max(processed_labels)
+            logging.info(f"Min processed label: {min_proc_label}, Max processed label: {max_proc_label}")
             num_unique_final_labels = len(np.unique(processed_labels))
             logging.info(f"Number of unique processed labels: {num_unique_final_labels}")
-            if num_expected_classes is not None:
-                if num_unique_final_labels > num_expected_classes:
-                    logging.critical(
-                        f"Found {num_unique_final_labels} unique labels, but model expects {num_expected_classes}.")
-                if np.max(processed_labels) >= num_expected_classes:
-                    logging.critical(
-                        f"Max processed label ({np.max(processed_labels)}) is out of bounds for model (0 to {num_expected_classes - 1}).")
 
-        # Ensure final_class_names_for_model has length num_expected_classes if provided, pad if necessary
-        if num_expected_classes is not None and len(final_class_names_for_model) < num_expected_classes:
+            if max_proc_label >= num_model_classes:
+                logging.critical(
+                    f"Max processed label ({max_proc_label}) is out of bounds for model (0 to {num_model_classes - 1}). This indicates a bug in label remapping or class counting.")
+        elif len(active_original_labels) > 0:  # Had original labels but processed_labels is empty
             logging.warning(
-                f"Number of derived class names ({len(final_class_names_for_model)}) is less than num_expected_classes ({num_expected_classes}). Padding with generic names.")
-            final_class_names_for_model.extend(
-                [f"GenClass {i}" for i in range(len(final_class_names_for_model), num_expected_classes)])
-        elif num_expected_classes is not None and len(final_class_names_for_model) > num_expected_classes:
-            logging.warning(
-                f"Number of derived class names ({len(final_class_names_for_model)}) is more than num_expected_classes ({num_expected_classes}). Truncating.")
-            final_class_names_for_model = final_class_names_for_model[:num_expected_classes]
+                "Processed labels array is empty despite having active original labels. Check label_map logic.")
+        else:  # No active labels to begin with
+            logging.info("No active labels to process from this file with current settings.")
 
         return iq_data, processed_labels, final_class_names_for_model
 
@@ -151,9 +145,6 @@ def load_h5_data(filepath, class_indices=None, num_expected_classes=None):
     except Exception as e:
         logging.error(f"Error loading HDF5 file {filepath}: {e}")
         raise
-
-
-# ... (segment_data and SignalDataset as before, ensure prints are converted to logging) ...
 
 def segment_data(iq_data, labels, segment_length, stride):
     if iq_data.ndim == 0 or iq_data.size == 0 or labels.ndim == 0 or labels.size == 0:

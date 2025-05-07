@@ -86,7 +86,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     filename = sys.argv[1]
-    data_limit = 5 # Default number of elements/slice dimension to show
+    data_limit = 50 # Default number of elements/slice dimension to show
     if len(sys.argv) > 2:
         try:
             data_limit = int(sys.argv[2])
